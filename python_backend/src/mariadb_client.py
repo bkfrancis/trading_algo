@@ -1,0 +1,114 @@
+import asyncio
+import mariadb
+
+
+class MariaDbClient:
+    def __init__(self, sim, user, pswd, host, port, db, db_queue):
+        self.sim = sim
+        self.user = user
+        self.pswd = pswd
+        self.host = host
+        self.port = port
+        self.db = db
+        self.db_queue = db_queue
+        self.conn = None
+        self.trade_history_table = self.get_trade_history_table()
+
+    def get_trade_history_table(self):
+        if self.sim:
+            return "paper_trade_history"
+        else:
+            return "trade_history"
+
+    async def clear_sim_order(self):
+        print("Clearing data from:", self.trade_history_table)
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            DELETE
+            FROM paper_trade_history
+            """
+        )
+        self.conn.commit()
+        cur.close()
+
+    async def save_order(self, order):
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            INSERT {}(
+                timestamp_ms,
+                tkr_id,
+                price,
+                fee,
+                action
+            )
+            VALUES
+            (?, ?, ?, ?, ?)
+            """.format(self.trade_history_table)
+        )
+        for row in cur:
+            print(row)
+        cur.close()
+        print("saving trade")
+
+    async def save_tkr(self, data):
+        cur = self.conn.cursor()
+        cur.executemany(
+            """
+            INSERT IGNORE ndax_tkr_data(
+                timestamp_ms,
+                high,
+                low,
+                open,
+                close,
+                volume,
+                inside_bid_price,
+                inside_ask_price,
+                tkr_id,
+                timestamp_beg_ms
+            )
+            VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            data
+        )
+        cur.executemany
+        self.conn.commit()
+        cur.close()
+        print("Saved tkr data")
+
+    async def start_receiver(self):
+        print("starting mariadb receiver")
+        while True:
+            message = await self.db_queue.get()
+            print("db data queue", message)
+
+            match message["action"]:
+                case "q":
+                    print("db client closing")
+                    self.conn.close()
+                    break
+
+                case "t":
+                    await self.save_tkr(message["data"])
+
+                case "o":
+                    await self.save_order(message["data"])
+
+    async def start(self):
+        print("Starting MariaDB client")
+        try:
+            self.conn = mariadb.connect(
+                user=self.user, password=self.pswd, host=self.host, port=self.port, database=self.db
+            )
+
+            await self.start_receiver()
+
+        except Exception as e:
+            print(e)
+            self.conn.close()
+
+        except asyncio.CancelledError:
+            print("Cancelling db client")
+            await self.start_receiver()
