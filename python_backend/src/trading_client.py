@@ -2,8 +2,8 @@ import asyncio
 
 
 class TradingClient:
-    def __init__(self, sim, fiat_id, tkr_id, data_queue, sender_queue, db_queue, trading_fee):
-        self.sim = sim
+    def __init__(self, live, fiat_id, tkr_id, data_queue, sender_queue, trading_fee):
+        self.live = live
         self.fiat_id = fiat_id
         self.tkr_id = tkr_id
         self.fiat_amount = 0
@@ -12,11 +12,10 @@ class TradingClient:
         self.price_data = []
         self.data_queue = data_queue
         self.sender_queue = sender_queue
-        self.db_queue = db_queue
 
     async def get_account_pos(self):
         # request to get account data
-        if self.sim:
+        if not self.live:
             self.fiat_amount = 10000
             self.crypto_amount = 0
         else:
@@ -26,10 +25,10 @@ class TradingClient:
         while True:
             message = await self.data_queue.get()
             match message["action"]:
-                case "q":
+                case "quit":
                     raise asyncio.CancelledError
 
-                case "a":
+                case "acct":
                     # receive account information
                     for pos in message["data"]:
                         match pos["ProductId"]:
@@ -42,9 +41,8 @@ class TradingClient:
                             case _:
                                 pass
 
-                case "t":
-                    # new ticker data received
-                    await self.db_queue.put(message)
+                case "tkr":
+                    print("process tkr data")
 
     async def start(self):
         try:
@@ -53,5 +51,4 @@ class TradingClient:
 
         except asyncio.CancelledError:
             print("Initiating shut down sequence")
-            await self.sender_queue.put({"action": "q"})    # unsubscribes and stops sender/receiver
-            await self.db_queue.put({"action": "q"})    # stop db client
+            await self.sender_queue.put({"action": "quit"})

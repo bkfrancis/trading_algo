@@ -3,8 +3,8 @@ import mariadb
 
 
 class MariaDbClient:
-    def __init__(self, sim, user, pswd, host, port, db, db_queue):
-        self.sim = sim
+    def __init__(self, live, user, pswd, host, port, db, db_queue):
+        self.live = live
         self.user = user
         self.pswd = pswd
         self.host = host
@@ -15,12 +15,12 @@ class MariaDbClient:
         self.trade_history_table = self.get_trade_history_table()
 
     def get_trade_history_table(self):
-        if self.sim:
+        if not self.live:
             return "paper_trade_history"
         else:
             return "trade_history"
 
-    async def clear_sim_order(self):
+    async def clear_paper_orders(self):
         print("Clearing data from:", self.trade_history_table)
         cur = self.conn.cursor()
         cur.execute(
@@ -47,10 +47,7 @@ class MariaDbClient:
             (?, ?, ?, ?, ?)
             """.format(self.trade_history_table)
         )
-        for row in cur:
-            print(row)
         cur.close()
-        print("saving trade")
 
     async def save_tkr(self, data):
         cur = self.conn.cursor()
@@ -73,10 +70,29 @@ class MariaDbClient:
             """,
             data
         )
-        cur.executemany
         self.conn.commit()
         cur.close()
-        print("Saved tkr data")
+
+    async def save_lvl1(self, data):
+        cur = self.conn.cursor()
+        cur.execute(
+            """
+            INSERT IGNORE ndax_lvl1_data(
+                timestamp_ms,
+                tkr_id,
+                best_bid,
+                best_ask,
+                last_trade_price,
+                last_trade_qty,
+                last_trade_time
+            )
+            VALUES
+            (?, ?, ?, ?, ?, ?, ?)
+            """,
+            list(data.values())
+        )
+        self.conn.commit()
+        cur.close()
 
     async def start_receiver(self):
         print("starting mariadb receiver")
@@ -85,16 +101,19 @@ class MariaDbClient:
             print("db data queue", message)
 
             match message["action"]:
-                case "q":
+                case "quit":
                     print("db client closing")
                     self.conn.close()
                     break
 
-                case "t":
+                case "tkr":
                     await self.save_tkr(message["data"])
 
-                case "o":
+                case "order":
                     await self.save_order(message["data"])
+
+                case "lvl1":
+                    await self.save_lvl1(message["data"])
 
     async def start(self):
         print("Starting MariaDB client")
