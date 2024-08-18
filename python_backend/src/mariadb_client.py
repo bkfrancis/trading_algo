@@ -121,13 +121,10 @@ class MariaDbClient:
             self.conn = mariadb.connect(
                 user=self.user, password=self.pswd, host=self.host, port=self.port, database=self.db
             )
-
             await self.start_receiver()
-
         except Exception as e:
             print(e)
             self.conn.close()
-
         except asyncio.CancelledError:
             print("Cancelling db client")
             await self.start_receiver()

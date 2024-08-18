@@ -15,7 +15,7 @@ class NdaxConfig:
     user_id = None
     acct_id = None
     oms_id = None
-    tkr_list = None
+    tkr_dct = None
     ws_api_port = None
 
 
@@ -60,14 +60,15 @@ class NdaxClient:
         self.acct_id = config.acct_id
         self.uri = config.uri
         self.oms_id = config.oms_id
-        self.tkr_list = config.tkr_list
+        self.tkr_dct = config.tkr_dct
         self.sender_queue = sender_queue
         self.data_queue = data_queue
         self.db_queue = db_queue
         self.ws = None
         self.authenticated = False
-        self.ws_api_queue = asyncio.Queue(maxsize=25)
-        self.ws_api_port = config.ws_api_port
+        self.server_queue = asyncio.Queue(maxsize=5)
+        self.server_port = config.server_port
+        self.server_clients = set()
 
     async def authenticate(self):
         print("authenticating")
@@ -118,11 +119,11 @@ class NdaxClient:
         await self.ws.send(json.dumps(message))
 
     async def subscribe_tkr(self):
-        for tkr in self.tkr_list:
+        for tkr, _ in self.tkr_dct.items():
             print("subscribing tkr:", tkr)
             payload = {
                 "OMSId": self.oms_id,
-                "InstrumentId": tkr,
+                "InstrumentId": int(tkr),
                 "Interval": 60,
                 "IncludeLastCount": 0
             }
@@ -135,11 +136,11 @@ class NdaxClient:
             await self.ws.send(json.dumps(message))
 
     async def unsubscribe_tkr(self):
-        for tkr in self.tkr_list:
+        for tkr, _ in self.tkr.items():
             print("unsubscribing tkr:", tkr)
             payload = {
                 "OMSId": self.oms_id,
-                "InstrumentId": tkr,
+                "InstrumentId": int(tkr),
             }
             message = {
                 "m": 0,
@@ -150,11 +151,11 @@ class NdaxClient:
             await self.ws.send(json.dumps(message))
 
     async def subscribe_lvl1(self):
-        for tkr in self.tkr_list:
+        for tkr, _ in self.tkr_dct.items():
             print("subscribing level 1 tkr:", tkr)
             payload = {
                 "OMSId": self.oms_id,
-                "InstrumentId": tkr,
+                "InstrumentId": int(tkr),
             }
             message = {
                 "m": 0,
@@ -165,11 +166,11 @@ class NdaxClient:
             await self.ws.send(json.dumps(message))
 
     async def unsubscribe_lvl1(self):
-        for tkr in self.tkr_list:
+        for tkr, _ in self.tkr_dct.items():
             print("unsubscribing level 1 tkr:", tkr)
             payload = {
                 "OMSId": self.oms_id,
-                "InstrumentId": tkr,
+                "InstrumentId": int(tkr),
             }
             message = {
                 "m": 0,
@@ -205,12 +206,11 @@ class NdaxClient:
 
     async def logout(self):
         print("Logging out")
-        payload = {}
         message = {
             "m": 0,
             "i": str(int(time.time())),
             "n": "LogOut",
-            "o": json.dumps(payload)
+            "o": "{}"
         }
         await self.ws.send(json.dumps(message))
 
@@ -227,7 +227,7 @@ class NdaxClient:
 
                 case "SubscribeLevel1" | "Level1UpdateEvent":
                     data = json.loads(response["o"], object_hook=lvl1_parser)
-                    await self.ws_api_queue.put({"action": "lvl1", "data": data})
+                    await self.server_queue.put({"action": "lvl1", "data": data})
                     await self.db_queue.put({"action": "lvl1", "data": data})
 
                 case "GetAccountPositions":
@@ -278,15 +278,26 @@ class NdaxClient:
                     print("Getting account positions")
                     await self.get_account_pos()
 
-    async def ws_api(self, ws):
-        while True:
-            message = await self.ws_api_queue.get()
-            message["data"] = {key: str(value) for key, value in message["data"].items()}
-            await ws.send(json.dumps(message))
+    async def server_handler(self, ws):
+        self.server_clients.add(ws)
+        try:
+            await ws.wait_closed()
+        finally:
+            self.server_clients.remove(ws)
 
-    async def start_ws_api(self):
-        async with websockets.serve(self.ws_api, "localhost", self.ws_api_port):
-            await asyncio.Future()
+    async def server(self):
+        while True:
+            message = await self.server_queue.get()
+            message["data"] = {key: str(value) for key, value in message["data"].items()}
+            for ws in self.server_clients:
+                try:
+                    await ws.send(json.dumps(message))
+                except Exception as e:
+                    print(e)
+
+    async def start_server(self):
+        async with websockets.serve(self.server_handler, "localhost", self.server_port):
+            await self.server()
 
     async def start(self):
         print("Starting NdaxWs client:", self.uri)
@@ -298,11 +309,10 @@ class NdaxClient:
                 if self.authenticated:
                     # await self.subscribe_tkr()
                     await self.subscribe_lvl1()
-
                     await asyncio.gather(
                         self.start_receiver(),
                         self.start_sender(),
-                        self.start_ws_api()
+                        self.start_server()
                     )
 
             except Exception as e:

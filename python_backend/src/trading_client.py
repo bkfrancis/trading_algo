@@ -48,7 +48,6 @@ class TradingClient:
         try:
             await self.get_account_pos()
             await self.start_processing()
-
         except asyncio.CancelledError:
             print("Initiating shut down sequence")
             await self.sender_queue.put({"action": "quit"})
