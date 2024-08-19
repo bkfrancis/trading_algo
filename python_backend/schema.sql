@@ -3,6 +3,7 @@
 CREATE TABLE `ndax_lvl1_data` (
   `timestamp_ms` bigint(20) NOT NULL,
   `tkr_id` int(11) NOT NULL,
+  `tkr` char(8) DEFAULT NULL,
   `best_bid` decimal(7,2) DEFAULT NULL,
   `best_ask` decimal(7,2) DEFAULT NULL,
   `last_trade_price` decimal(7,2) DEFAULT NULL,
@@ -16,6 +17,7 @@ CREATE TABLE `ndax_lvl1_data` (
 CREATE TABLE `ndax_tkr_data` (
   `timestamp_ms` bigint(20) NOT NULL,
   `tkr_id` int(11) NOT NULL,
+  `tkr` char(8) DEFAULT NULL,
   `high` decimal(7,2) DEFAULT NULL,
   `low` decimal(7,2) DEFAULT NULL,
   `open` decimal(7,2) DEFAULT NULL,

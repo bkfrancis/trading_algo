@@ -227,8 +227,9 @@ class NdaxClient:
 
                 case "SubscribeLevel1" | "Level1UpdateEvent":
                     data = json.loads(response["o"], object_hook=lvl1_parser)
-                    await self.server_queue.put({"action": "lvl1", "data": data})
+                    data["tkr"] = self.tkr_dct[str(data["tkr_id"])]
                     await self.db_queue.put({"action": "lvl1", "data": data})
+                    await self.server_queue.put({"action": "lvl1", "data": data})
 
                 case "GetAccountPositions":
                     await self.data_queue.put(
@@ -314,10 +315,8 @@ class NdaxClient:
                         self.start_sender(),
                         self.start_server()
                     )
-
             except Exception as e:
                 print(e)
-
             except asyncio.CancelledError:
                 print("Continuing websocket")
                 await asyncio.gather(

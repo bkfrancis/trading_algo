@@ -84,10 +84,11 @@ class MariaDbClient:
                 best_ask,
                 last_trade_price,
                 last_trade_qty,
-                last_trade_time
+                last_trade_time,
+                tkr
             )
             VALUES
-            (?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             list(data.values())
         )
