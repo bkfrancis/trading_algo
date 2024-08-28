@@ -88,7 +88,7 @@ class NdaxClient:
         }
         message = {
             "m": 0,
-            "i": str(int(time.time())),
+            "i": int(time.time()),
             "n": "AuthenticateUser",
             "o": json.dumps(payload)
         }
@@ -100,7 +100,6 @@ class NdaxClient:
         if r["Authenticated"] is True:
             print("NDAX user authenticated")
             self.authenticated = True
-
         else:
             print("NDAX user not authenticated")
             await self.data_queue.put({"action": "quit"})
@@ -112,7 +111,7 @@ class NdaxClient:
         }
         message = {
             "m": 0,
-            "i": str(int(time.time())),
+            "i": int(time.time()),
             "n": "GetAccountPositions",
             "o": json.dumps(payload)
         }
@@ -129,7 +128,7 @@ class NdaxClient:
             }
             message = {
                 "m": 0,
-                "i": str(int(time.time())),
+                "i": int(time.time()),
                 "n": "SubscribeTicker",
                 "o": json.dumps(payload),
             }
@@ -144,7 +143,7 @@ class NdaxClient:
             }
             message = {
                 "m": 0,
-                "i": str(int(time.time())),
+                "i": int(time.time()),
                 "n": "UnsubscribeTicker",
                 "o": json.dumps(payload),
             }
@@ -159,7 +158,7 @@ class NdaxClient:
             }
             message = {
                 "m": 0,
-                "i": str(int(time.time())),
+                "i": int(time.time()),
                 "n": "SubscribeLevel1",
                 "o": json.dumps(payload)
             }
@@ -174,7 +173,7 @@ class NdaxClient:
             }
             message = {
                 "m": 0,
-                "i": str(int(time.time())),
+                "i": int(time.time()),
                 "n": "UnsubscribeLevel1",
                 "o": json.dumps(payload)
             }
@@ -198,7 +197,7 @@ class NdaxClient:
             }
             message = {
                 "m": 0,
-                "i": str(int(time.time())),
+                "i": int(time.time()),
                 "n": "SendOrder",
                 "o": json.dumps(payload)
             }
@@ -208,7 +207,7 @@ class NdaxClient:
         print("Logging out")
         message = {
             "m": 0,
-            "i": str(int(time.time())),
+            "i": int(time.time()),
             "n": "LogOut",
             "o": "{}"
         }

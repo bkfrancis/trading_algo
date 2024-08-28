@@ -46,6 +46,7 @@ class TradingClient:
 
     async def start(self):
         try:
+            await asyncio.sleep(1)
             await self.get_account_pos()
             await self.start_processing()
         except asyncio.CancelledError:
