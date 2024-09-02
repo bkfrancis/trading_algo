@@ -99,7 +99,6 @@ class MariaDbClient:
         print("starting mariadb receiver")
         while True:
             message = await self.db_queue.get()
-            print("db data queue", message)
 
             match message["action"]:
                 case "quit":

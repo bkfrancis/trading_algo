@@ -228,24 +228,21 @@ class NdaxClient:
                     data = json.loads(response["o"], object_hook=lvl1_parser)
                     data["tkr"] = self.tkr_dct[str(data["tkr_id"])]
                     await self.db_queue.put({"action": "lvl1", "data": data})
-                    await self.server_queue.put({"action": "lvl1", "data": data})
+                    if data["tkr_id"] == 3:
+                        await self.server_queue.put({"action": "lvl1", "data": data})
 
                 case "GetAccountPositions":
-                    await self.data_queue.put(
-                        {
-                            "action": "acct",
-                            "data": json.loads(response["o"])
-                        }
-                    )
+                    await self.data_queue.put({
+                        "action": "acct",
+                        "data": json.loads(response["o"])
+                    })
 
                 case "SendOrder":
                     # Order confirmation
-                    await self.data_queue.put(
-                        {
-                            "action": "o",
-                            "data": json.loads(response["o"])
-                        }
-                    )
+                    await self.data_queue.put({
+                        "action": "o",
+                        "data": json.loads(response["o"])
+                    })
 
                 case "LogOut":
                     await self.db_queue.put({"action": "quit"})
@@ -288,7 +285,12 @@ class NdaxClient:
     async def server(self):
         while True:
             message = await self.server_queue.get()
-            message["data"] = {key: str(value) for key, value in message["data"].items()}
+            message["data"] = {
+                key: float(value)
+                if isinstance(value, dec)
+                else value
+                for key, value in message["data"].items()
+            }
             for ws in self.server_clients:
                 try:
                     await ws.send(json.dumps(message))
