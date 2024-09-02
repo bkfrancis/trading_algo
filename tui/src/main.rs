@@ -1,4 +1,4 @@
-use std::io::{stdout, Result};
+use std::io::stdout;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
@@ -7,40 +7,39 @@ use ratatui::{
     },
     Terminal,
 };
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self, Sender, Receiver};
+use anyhow::Result;
+use cli_log::*;
 
 mod ws_client;
 mod tui;
-use ws_client::WsClient;
+use ws_client::{WsClient, Lvl1Data};
 use tui::Tui;
 
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let (tx, rx) = mpsc::channel(5);
-
-    let ws = WsClient::new("ws://localhost:8765".into(), tx);
-
+    init_cli_log!();
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
+
+    let (tx, rx): (Sender<Option<Lvl1Data>>, Receiver<Option<Lvl1Data>>) = mpsc::channel(5);
+    let url: String = "ws://localhost:8765".into();
+    let mut ws = WsClient::new(url, tx);
+
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     terminal.clear()?;
+    let mut tui = Tui::new(terminal, rx);
 
-    let mut tui = Tui::new(terminal , rx);
-    
-    let res = tokio::try_join!(ws.run(), tui.run());
+    // Concurrent
+    let result = tokio::try_join!(ws.run(), tui.run());
+    match result {
+        Ok((_ws, _tui)) => {},
+        Err(e) => debug!("Tasks interrupted: {}", e),
+    }
 
     stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
-
-    match res {
-        Ok((_ws_res, _tui_res)) => {
-            println!("Closing Program");
-        },
-        Err(err) => {
-            println!("Tasks Interrupted: {}", err);
-        },
-    }
 
     Ok(())
 }
