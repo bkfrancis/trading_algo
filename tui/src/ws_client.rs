@@ -1,14 +1,10 @@
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::protocol::Message,
-};
-use tokio::sync::mpsc::Sender;
-use futures_util::StreamExt;     // StreamExt, extends the trait to allow .next()
 use anyhow::{anyhow, Result};
-use serde::{Serialize, Deserialize};
-use serde_json;
 use cli_log::*;
-
+use futures_util::StreamExt; // StreamExt, extends the trait to allow .next()
+use serde::{Deserialize, Serialize};
+use serde_json;
+use tokio::sync::mpsc::Sender;
+use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Lvl1Data {
@@ -32,7 +28,7 @@ impl Default for Lvl1Data {
             best_ask: 0.0,
             last_trade_price: 0.0,
             last_trade_qty: 0.0,
-            last_trade_time: 0
+            last_trade_time: 0,
         }
     }
 }
@@ -43,7 +39,6 @@ struct Lvl1Msg {
     data: Lvl1Data,
 }
 
-
 pub struct WsClient {
     url: String,
     tx: Sender<Option<Lvl1Data>>,
@@ -51,10 +46,7 @@ pub struct WsClient {
 
 impl WsClient {
     pub fn new(url: String, tx: Sender<Option<Lvl1Data>>) -> Self {
-        Self {
-            url,
-            tx,
-        }
+        Self { url, tx }
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -70,9 +62,9 @@ impl WsClient {
                     let parsed_msg: Lvl1Msg = serde_json::from_str(&text)?;
                     debug!("{:#?}", parsed_msg);
                     self.tx.send(Some(parsed_msg.data)).await?;
-                },
+                }
                 Err(e) => return Err(anyhow!(e)),
-                _ => {},
+                _ => {}
             }
         }
         Ok(())

@@ -1,4 +1,5 @@
-use std::io::stdout;
+use anyhow::Result;
+use cli_log::*;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::{
@@ -7,15 +8,13 @@ use ratatui::{
     },
     Terminal,
 };
-use tokio::sync::mpsc::{self, Sender, Receiver};
-use anyhow::Result;
-use cli_log::*;
+use std::io::stdout;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
-mod ws_client;
 mod tui;
-use ws_client::{WsClient, Lvl1Data};
+mod ws_client;
 use tui::Tui;
-
+use ws_client::{Lvl1Data, WsClient};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -34,7 +33,7 @@ async fn main() -> Result<()> {
     // Concurrent
     let result = tokio::try_join!(ws.run(), tui.run());
     match result {
-        Ok((_ws, _tui)) => {},
+        Ok((_ws, _tui)) => {}
         Err(e) => debug!("Tasks interrupted: {}", e),
     }
 
